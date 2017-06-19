@@ -65,6 +65,7 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
+
 int main() {
   uWS::Hub h;
 
@@ -78,11 +79,15 @@ int main() {
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
     cout << sdata << endl;
+
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
+
       string s = hasData(sdata);
       if (s != "") {
+
         auto j = json::parse(s);
         string event = j[0].get<string>();
+
         if (event == "telemetry") {
           // j[1] is the data JSON object
           vector<double> ptsx = j[1]["ptsx"];
@@ -92,14 +97,19 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          Eigen::VectorXd ptsx_eigen(ptsx.size()) ;
+          Eigen::VectorXd ptsy_eigen(ptsx.size()) ;
+
+          Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1) ;
+
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          double steer_value = 0;
+          double throttle_value = 0.1;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -118,8 +128,26 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+          vector<double> next_x_vals ;
+          vector<double> next_y_vals ;
+
+          for(int index = 0 ; index < ptsx.size() ; ++index)
+          {
+            // Distance from point to vehicle in global coordinate system
+            double x_delta = ptsx[index] - px ;
+            double y_delta = ptsy[index] - py ;
+            double distance = std::sqrt((x_delta * x_delta) + (y_delta * y_delta)) ;
+
+            // Angle between point and x coordinates
+            double angle = atan2(y_delta, x_delta) ;
+            double angle_to_car = angle - psi ;
+
+            double x = distance * std::cos(angle_to_car) ;
+            double y = distance * std::sin(angle_to_car) ;
+
+            next_x_vals.push_back(x) ;
+            next_y_vals.push_back(y) ;
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
@@ -129,7 +157,7 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+//          std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.

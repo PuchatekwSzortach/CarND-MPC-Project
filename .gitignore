@@ -3,3 +3,8 @@ build
 tags
 .editorconfig
 .DS_Store
+
+
+.idea/
+# CMake
+cmake-build-debug/
