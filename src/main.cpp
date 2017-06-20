@@ -171,8 +171,6 @@ int main() {
             ptsy_eigen[index] = ptsy[index];
           }
 
-          Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 2);
-
           double cte = get_cross_track_error(px, py, ptsx, ptsy);
           double epsi = get_steering_error(psi, ptsx, ptsy);
 
@@ -183,7 +181,46 @@ int main() {
           // Compute control commands
           vector<double> control_commands ;
 
+          Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1);
           control_commands = mpc.Solve(state, polynomial_coefficients);
+
+
+//          std::vector<double> x_vals = {state[0]};
+//          std::vector<double> y_vals = {state[1]};
+//          std::vector<double> psi_vals = {state[2]};
+//          std::vector<double> v_vals = {state[3]};
+//          std::vector<double> cte_vals = {state[4]};
+//          std::vector<double> epsi_vals = {state[5]};
+//          std::vector<double> delta_vals = {};
+//          std::vector<double> a_vals = {};
+//
+//          std::cout << "Starting computations" << std::endl ;
+//          int iterations = 10 ;
+//          for(int index = 0 ; index < iterations ; ++index)
+//          {
+//
+//            auto vars = mpc.Solve(state, polynomial_coefficients);
+//
+//            x_vals.push_back(vars[0]);
+//            y_vals.push_back(vars[1]);
+//            psi_vals.push_back(vars[2]);
+//            v_vals.push_back(vars[3]);
+//            cte_vals.push_back(vars[4]);
+//            epsi_vals.push_back(vars[5]);
+//
+//            delta_vals.push_back(vars[6]);
+//            a_vals.push_back(vars[7]);
+//
+//          }
+//          std::cout << "Finished computations" << std::endl ;
+//
+//          std::cout << "Car started at " << px << ", " << py << ", " << psi << std::endl ;
+//          std::cout << "Second waypoint is at " << ptsx[1] << ", " << ptsy[1] << ", " << std::atan2(ptsy[1], ptsx[1]) << std::endl ;
+//          std::cout << "x, y, psi" << std::endl ;
+//          for(int index = 0 ; index < iterations ; ++index)
+//          {
+//            std::cout << x_vals[index] << ", " << y_vals[index] << ", " << psi_vals[index] << std::endl ;
+//          }
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -196,6 +233,9 @@ int main() {
 
           double steer_value = control_commands[6] ;
           double throttle_value = control_commands[7] ;
+
+          std::cout << "Raw steer value: " << steer_value << std::endl ;
+          std::cout << "Throttle value" << throttle_value << std::endl ;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -212,8 +252,7 @@ int main() {
             double x_global_coordinates = ptsx_eigen[index] ;
 
             double y_global_coordinates =
-                polynomial_coefficients[0] + (polynomial_coefficients[1] * x_global_coordinates) +
-                (polynomial_coefficients[2] * x_global_coordinates * x_global_coordinates);
+                polynomial_coefficients[0] + (polynomial_coefficients[1] * x_global_coordinates) ;
 
             double x_delta = x_global_coordinates - px ;
             double y_delta = y_global_coordinates - py ;
