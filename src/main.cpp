@@ -66,10 +66,25 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 }
 
 
+// Get coefficients of a straight line that's perpendicular to provided line and passes through point (x, y)
+Eigen::VectorXd get_perpendicular_line_passing_given_point(
+  Eigen::VectorXd polynomial_coefficients, double x, double y)
+{
+  // Find equation of line perpendicular to waypoints line that passes through point (x, y)
+  double perpendicular_line_slope = -1.0 / polynomial_coefficients[1] ;
+  double perpendicular_line_offset = y - (perpendicular_line_slope * x) ;
+
+  Eigen::VectorXd perpendicular_line_coefficients(2) ;
+  perpendicular_line_coefficients << perpendicular_line_offset, perpendicular_line_slope ;
+
+  return perpendicular_line_coefficients ;
+}
+
+
 // Get cross track error
 double get_cross_track_error(double x, double y, std::vector<double> ptsx, std::vector<double> ptsy)
 {
-  // We will approximate cross track error by ftting a line to first two waypoints and computing
+  // We will approximate cross track error by fitting a line to first two waypoints and computing
   // shortest distance from vehicle to that line
   Eigen::VectorXd ptsx_eigen(2) ;
   Eigen::VectorXd ptsy_eigen(2) ;
@@ -80,16 +95,16 @@ double get_cross_track_error(double x, double y, std::vector<double> ptsx, std::
   // Fit a line into first two waypoints
   Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1) ;
 
-  // Find equation of line perpendicular to waypoints line that passes through point (x, y)
-  double perpendicular_line_slope = -1.0 / polynomial_coefficients[1] ;
-  double perpendicular_line_offset = y - (perpendicular_line_slope * x) ;
+  Eigen::VectorXd perpendicular_line_coefficients =
+    get_perpendicular_line_passing_given_point(polynomial_coefficients, x, y) ;
 
   // Find an intersection of waypoints line and perpendicular line
   double lines_intersection_x =
-    (perpendicular_line_offset - polynomial_coefficients[0]) /
-    (polynomial_coefficients[1] - perpendicular_line_slope) ;
+    (perpendicular_line_coefficients[0] - polynomial_coefficients[0]) /
+    (polynomial_coefficients[1] - perpendicular_line_coefficients[1]) ;
 
-  double lines_intersection_y = (perpendicular_line_slope * lines_intersection_x) + perpendicular_line_offset ;
+  double lines_intersection_y =
+    (perpendicular_line_coefficients[1] * lines_intersection_x) + perpendicular_line_coefficients[0] ;
 
   double x_difference = x - lines_intersection_x ;
   double y_difference = y - lines_intersection_y ;
@@ -97,6 +112,19 @@ double get_cross_track_error(double x, double y, std::vector<double> ptsx, std::
   // CTE is then a distance between (x, y) and point of intersection of waypoints line and perpendicular line that
   // passes through (x, y)
   return std::sqrt((x_difference * x_difference) + (y_difference * y_difference)) ;
+}
+
+
+double get_steering_error(double psi, std::vector<double> ptsx, std::vector<double> ptsy)
+{
+  double waypoints_heading = std::atan2(ptsy[1] - ptsy[0], ptsx[1] - ptsx[0]) ;
+  double heading_difference = psi - waypoints_heading ;
+
+  while(heading_difference < -M_PI) { heading_difference += 2 * M_PI ; }
+  while(heading_difference > M_PI) { heading_difference -= 2 * M_PI ; }
+
+  // Since we want to add steering error to cost function, it should always be positive
+  return std::abs(heading_difference) ;
 }
 
 
@@ -144,7 +172,10 @@ int main() {
           Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 2) ;
 
           double cte = get_cross_track_error(px, py, ptsx, ptsy) ;
-          std::cout << "CTE is " << cte << std::endl ;
+          double epsi = get_steering_error(psi, ptsx, ptsy) ;
+          std::cout << "cte is " << cte << std::endl ;
+          std::cout << "epsi s " << epsi << std::endl ;
+
 //
 //          // Since we are doing planning in car coordinate system, current position is always (0, 0)
 //          Eigen::VectorXd state(4) ;
