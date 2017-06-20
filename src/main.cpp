@@ -78,7 +78,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+//    cout << sdata << endl;
 
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
 
@@ -97,55 +97,28 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          //Display the waypoints/reference line
-          vector<double> next_x_vals ;
-          vector<double> next_y_vals ;
-
-          // Calculate waypoints in car coordinate system
-          for(int index = 0 ; index < ptsx.size() ; ++index)
-          {
-            // Distance from point to vehicle in global coordinate system
-            double x_delta = ptsx[index] - px ;
-            double y_delta = ptsy[index] - py ;
-            double distance = std::sqrt((x_delta * x_delta) + (y_delta * y_delta)) ;
-
-            // Angle between point and x coordinates
-            double angle = atan2(y_delta, x_delta) ;
-            double angle_to_car = angle - psi ;
-
-            double x = distance * std::cos(angle_to_car) ;
-            double y = distance * std::sin(angle_to_car) ;
-
-            next_x_vals.push_back(x) ;
-            next_y_vals.push_back(y) ;
-          }
-
-          Eigen::VectorXd ptsx_eigen(next_x_vals.size()) ;
-          Eigen::VectorXd ptsy_eigen(next_x_vals.size()) ;
+          Eigen::VectorXd ptsx_eigen(ptsx.size()) ;
+          Eigen::VectorXd ptsy_eigen(ptsx.size()) ;
 
           // Copy std::vector content to eigen vector
           for(int index = 0 ; index < ptsx.size() ; ++index)
           {
-            ptsx_eigen[index] = next_x_vals[index] ;
-            ptsy_eigen[index] = next_y_vals[index] ;
+            ptsx_eigen[index] = ptsx[index] ;
+            ptsy_eigen[index] = ptsy[index] ;
           }
 
           Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 2) ;
 
-          //Display the MPC predicted trajectory
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
-
-          for(int index = 0 ; index < ptsx.size() ; ++index)
-          {
-            double x = ptsx_eigen[index] ;
-            mpc_x_vals.push_back(x) ;
-
-            double y = polynomial_coefficients[0] + (polynomial_coefficients[1] * x) +
-              (polynomial_coefficients[2] * x * x);
-            
-            mpc_y_vals.push_back(y) ;
-          }
+//          double cte = polyeval(polynomial_coefficients, 0) - 0 ;
+//
+//          // Since we are doing planning in car coordinate system, current position is always (0, 0)
+//          Eigen::VectorXd state(4) ;
+//          state << 0, 0, psi, v ;
+//
+//          // Compute control commands
+//          vector<double> control_commands = mpc.Solve(state, polynomial_coefficients);
+//
+//          std::cout << "Control commands vector has size: " << control_commands.size() << std::endl ;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -162,11 +135,59 @@ int main() {
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
+          //Display the MPC predicted trajectory
+          vector<double> mpc_x_vals;
+          vector<double> mpc_y_vals;
+
+          for(int index = 0 ; index < ptsx.size() ; ++index)
+          {
+            double x_global_coordinates = ptsx_eigen[index] ;
+
+            double y_global_coordinates =
+                polynomial_coefficients[0] + (polynomial_coefficients[1] * x_global_coordinates) +
+                (polynomial_coefficients[2] * x_global_coordinates * x_global_coordinates);
+
+            double x_delta = x_global_coordinates - px ;
+            double y_delta = y_global_coordinates - py ;
+
+            double distance = std::sqrt((x_delta * x_delta) + (y_delta * y_delta)) ;
+
+            // Angle between point and x coordinates
+            double angle = atan2(y_delta, x_delta) - psi ;
+
+            double x = distance * std::cos(angle) ;
+            double y = distance * std::sin(angle) ;
+
+            mpc_x_vals.push_back(x) ;
+            mpc_y_vals.push_back(y) ;
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
+
+          //Display the waypoints/reference line
+          vector<double> next_x_vals ;
+          vector<double> next_y_vals ;
+
+          // Calculate waypoints in car coordinate system
+          for(int index = 0 ; index < ptsx.size() ; ++index)
+          {
+            // Distance from point to vehicle in global coordinate system
+            double x_delta = ptsx[index] - px ;
+            double y_delta = ptsy[index] - py ;
+            double distance = std::sqrt((x_delta * x_delta) + (y_delta * y_delta)) ;
+
+            // Angle between point and x coordinates
+            double angle = atan2(y_delta, x_delta) - psi ;
+
+            double x = distance * std::cos(angle) ;
+            double y = distance * std::sin(angle) ;
+
+            next_x_vals.push_back(x) ;
+            next_y_vals.push_back(y) ;
+          }
 
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
@@ -186,7 +207,11 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+
+          int delay = 0 ;
+          this_thread::sleep_for(chrono::milliseconds(delay));
+          std::cout << "DELAY SET TO 0! REMEMBER TO CHANGE THIS BACK LATER!" << std::endl ;
+
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
