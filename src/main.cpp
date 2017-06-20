@@ -140,7 +140,6 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-//    cout << sdata << endl;
 
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
 
@@ -180,7 +179,6 @@ int main() {
 
           // Compute control commands
           vector<double> control_commands = mpc.Solve(state, polynomial_coefficients);
-          std::cout << "Control commands vector has size: " << control_commands.size() << std::endl ;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -188,13 +186,17 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value = 0;
-          double throttle_value = 0;
+          double steer_value = control_commands[6] ;
+          double throttle_value = control_commands[7] ;
+
+          std::cout << "Steer value in degrees: " << rad2deg(steer_value) << std::endl ;
+          std::cout << "Steer value fed to simulator: " << steer_value / deg2rad(25) << std::endl ;
+          std::cout << "Throttle value: " << throttle_value << std::endl ;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = steer_value / deg2rad(25);
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory
