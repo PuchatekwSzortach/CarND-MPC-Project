@@ -114,17 +114,21 @@ double get_cross_track_error(double x, double y, std::vector<double> ptsx, std::
   return std::sqrt((x_difference * x_difference) + (y_difference * y_difference)) ;
 }
 
+double get_normalized_angle(double angle)
+{
+  while(angle < -M_PI) { angle += 2 * M_PI ; }
+  while(angle > M_PI) { angle -= 2 * M_PI ; }
+
+  return angle ;
+}
+
 
 double get_steering_error(double psi, std::vector<double> ptsx, std::vector<double> ptsy)
 {
   double waypoints_heading = std::atan2(ptsy[1] - ptsy[0], ptsx[1] - ptsx[0]) ;
   double heading_difference = psi - waypoints_heading ;
 
-  while(heading_difference < -M_PI) { heading_difference += 2 * M_PI ; }
-  while(heading_difference > M_PI) { heading_difference -= 2 * M_PI ; }
-
-  // Since we want to add steering error to cost function, it should always be positive
-  return std::abs(heading_difference) ;
+  return get_normalized_angle(heading_difference) ;
 }
 
 
@@ -158,27 +162,28 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          Eigen::VectorXd ptsy_eigen(ptsx.size()) ;
-          Eigen::VectorXd ptsx_eigen(ptsx.size()) ;
+          Eigen::VectorXd ptsy_eigen(ptsx.size());
+          Eigen::VectorXd ptsx_eigen(ptsx.size());
 
           // Copy std::vector content to eigen vector
-          for(int index = 0 ; index < ptsx.size() ; ++index)
-          {
-            ptsx_eigen[index] = ptsx[index] ;
-            ptsy_eigen[index] = ptsy[index] ;
+          for (int index = 0; index < ptsx.size(); ++index) {
+            ptsx_eigen[index] = ptsx[index];
+            ptsy_eigen[index] = ptsy[index];
           }
 
-          Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 2) ;
+          Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 2);
 
-          double cte = get_cross_track_error(px, py, ptsx, ptsy) ;
-          double epsi = get_steering_error(psi, ptsx, ptsy) ;
+          double cte = get_cross_track_error(px, py, ptsx, ptsy);
+          double epsi = get_steering_error(psi, ptsx, ptsy);
 
           // Construct state vector
-          Eigen::VectorXd state(6) ;
-          state << px, py, psi, v, cte, epsi ;
+          Eigen::VectorXd state(6);
+          state << px, py, psi, v, cte, epsi;
 
           // Compute control commands
-          vector<double> control_commands = mpc.Solve(state, polynomial_coefficients);
+          vector<double> control_commands ;
+
+          control_commands = mpc.Solve(state, polynomial_coefficients);
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -186,12 +191,11 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
+//          double steer_value = 0 ;
+//          double throttle_value = 0 ;
+
           double steer_value = control_commands[6] ;
           double throttle_value = control_commands[7] ;
-
-          std::cout << "Steer value in degrees: " << rad2deg(steer_value) << std::endl ;
-          std::cout << "Steer value fed to simulator: " << steer_value / deg2rad(25) << std::endl ;
-          std::cout << "Throttle value: " << throttle_value << std::endl ;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
