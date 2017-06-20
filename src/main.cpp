@@ -66,6 +66,40 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 }
 
 
+// Get cross track error
+double get_cross_track_error(double x, double y, std::vector<double> ptsx, std::vector<double> ptsy)
+{
+  // We will approximate cross track error by ftting a line to first two waypoints and computing
+  // shortest distance from vehicle to that line
+  Eigen::VectorXd ptsx_eigen(2) ;
+  Eigen::VectorXd ptsy_eigen(2) ;
+
+  ptsx_eigen << ptsx[0], ptsx[1] ;
+  ptsy_eigen << ptsy[0], ptsy[1] ;
+
+  // Fit a line into first two waypoints
+  Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1) ;
+
+  // Find equation of line perpendicular to waypoints line that passes through point (x, y)
+  double perpendicular_line_slope = -1.0 / polynomial_coefficients[1] ;
+  double perpendicular_line_offset = y - (perpendicular_line_slope * x) ;
+
+  // Find an intersection of waypoints line and perpendicular line
+  double lines_intersection_x =
+    (perpendicular_line_offset - polynomial_coefficients[0]) /
+    (polynomial_coefficients[1] - perpendicular_line_slope) ;
+
+  double lines_intersection_y = (perpendicular_line_slope * lines_intersection_x) + perpendicular_line_offset ;
+
+  double x_difference = x - lines_intersection_x ;
+  double y_difference = y - lines_intersection_y ;
+
+  // CTE is then a distance between (x, y) and point of intersection of waypoints line and perpendicular line that
+  // passes through (x, y)
+  return std::sqrt((x_difference * x_difference) + (y_difference * y_difference)) ;
+}
+
+
 int main() {
   uWS::Hub h;
 
@@ -97,8 +131,8 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          Eigen::VectorXd ptsx_eigen(ptsx.size()) ;
           Eigen::VectorXd ptsy_eigen(ptsx.size()) ;
+          Eigen::VectorXd ptsx_eigen(ptsx.size()) ;
 
           // Copy std::vector content to eigen vector
           for(int index = 0 ; index < ptsx.size() ; ++index)
@@ -109,7 +143,8 @@ int main() {
 
           Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 2) ;
 
-//          double cte = polyeval(polynomial_coefficients, 0) - 0 ;
+          double cte = get_cross_track_error(px, py, ptsx, ptsy) ;
+          std::cout << "CTE is " << cte << std::endl ;
 //
 //          // Since we are doing planning in car coordinate system, current position is always (0, 0)
 //          Eigen::VectorXd state(4) ;
