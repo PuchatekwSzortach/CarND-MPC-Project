@@ -173,18 +173,14 @@ int main() {
 
           double cte = get_cross_track_error(px, py, ptsx, ptsy) ;
           double epsi = get_steering_error(psi, ptsx, ptsy) ;
-          std::cout << "cte is " << cte << std::endl ;
-          std::cout << "epsi s " << epsi << std::endl ;
 
-//
-//          // Since we are doing planning in car coordinate system, current position is always (0, 0)
-//          Eigen::VectorXd state(4) ;
-//          state << 0, 0, psi, v ;
-//
-//          // Compute control commands
-//          vector<double> control_commands = mpc.Solve(state, polynomial_coefficients);
-//
-//          std::cout << "Control commands vector has size: " << control_commands.size() << std::endl ;
+          // Construct state vector
+          Eigen::VectorXd state(6) ;
+          state << px, py, psi, v, cte, epsi ;
+
+          // Compute control commands
+          vector<double> control_commands = mpc.Solve(state, polynomial_coefficients);
+          std::cout << "Control commands vector has size: " << control_commands.size() << std::endl ;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -193,7 +189,7 @@ int main() {
           *
           */
           double steer_value = 0;
-          double throttle_value = 0.1;
+          double throttle_value = 0;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
