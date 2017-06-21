@@ -162,14 +162,21 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          Eigen::VectorXd ptsy_eigen(ptsx.size());
-          Eigen::VectorXd ptsx_eigen(ptsx.size());
+//          Eigen::VectorXd ptsy_eigen(ptsx.size());
+//          Eigen::VectorXd ptsx_eigen(ptsx.size());
 
-          // Copy std::vector content to eigen vector
-          for (int index = 0; index < ptsx.size(); ++index) {
-            ptsx_eigen[index] = ptsx[index];
-            ptsy_eigen[index] = ptsy[index];
-          }
+//          // Copy std::vector content to eigen vector
+//          for (int index = 0; index < ptsx.size(); ++index) {
+//            ptsx_eigen[index] = ptsx[index];
+//            ptsy_eigen[index] = ptsy[index];
+//          }
+
+          Eigen::VectorXd ptsx_eigen(2) ;
+          Eigen::VectorXd ptsy_eigen(2);
+
+          // We will only use two points for now
+          ptsx_eigen << ptsx[1], ptsx[3] ;
+          ptsy_eigen << ptsy[1], ptsy[3] ;
 
           double cte = get_cross_track_error(px, py, ptsx, ptsy);
           double epsi = get_steering_error(psi, ptsx, ptsy);
@@ -184,44 +191,6 @@ int main() {
           Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1);
           control_commands = mpc.Solve(state, polynomial_coefficients);
 
-
-//          std::vector<double> x_vals = {state[0]};
-//          std::vector<double> y_vals = {state[1]};
-//          std::vector<double> psi_vals = {state[2]};
-//          std::vector<double> v_vals = {state[3]};
-//          std::vector<double> cte_vals = {state[4]};
-//          std::vector<double> epsi_vals = {state[5]};
-//          std::vector<double> delta_vals = {};
-//          std::vector<double> a_vals = {};
-//
-//          std::cout << "Starting computations" << std::endl ;
-//          int iterations = 10 ;
-//          for(int index = 0 ; index < iterations ; ++index)
-//          {
-//
-//            auto vars = mpc.Solve(state, polynomial_coefficients);
-//
-//            x_vals.push_back(vars[0]);
-//            y_vals.push_back(vars[1]);
-//            psi_vals.push_back(vars[2]);
-//            v_vals.push_back(vars[3]);
-//            cte_vals.push_back(vars[4]);
-//            epsi_vals.push_back(vars[5]);
-//
-//            delta_vals.push_back(vars[6]);
-//            a_vals.push_back(vars[7]);
-//
-//          }
-//          std::cout << "Finished computations" << std::endl ;
-//
-//          std::cout << "Car started at " << px << ", " << py << ", " << psi << std::endl ;
-//          std::cout << "Second waypoint is at " << ptsx[1] << ", " << ptsy[1] << ", " << std::atan2(ptsy[1], ptsx[1]) << std::endl ;
-//          std::cout << "x, y, psi" << std::endl ;
-//          for(int index = 0 ; index < iterations ; ++index)
-//          {
-//            std::cout << x_vals[index] << ", " << y_vals[index] << ", " << psi_vals[index] << std::endl ;
-//          }
-
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
@@ -234,9 +203,6 @@ int main() {
           double steer_value = control_commands[6] ;
           double throttle_value = control_commands[7] ;
 
-          std::cout << "Raw steer value: " << steer_value << std::endl ;
-          std::cout << "Throttle value" << throttle_value << std::endl ;
-
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
@@ -247,7 +213,7 @@ int main() {
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
-          for(int index = 0 ; index < ptsx.size() ; ++index)
+          for(int index = 0 ; index < ptsx_eigen.size() ; ++index)
           {
             double x_global_coordinates = ptsx_eigen[index] ;
 
