@@ -66,72 +66,6 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 }
 
 
-// Get coefficients of a straight line that's perpendicular to provided line and passes through point (x, y)
-Eigen::VectorXd get_perpendicular_line_passing_given_point(
-  Eigen::VectorXd polynomial_coefficients, double x, double y)
-{
-  // Find equation of line perpendicular to waypoints line that passes through point (x, y)
-  double perpendicular_line_slope = -1.0 / polynomial_coefficients[1] ;
-  double perpendicular_line_offset = y - (perpendicular_line_slope * x) ;
-
-  Eigen::VectorXd perpendicular_line_coefficients(2) ;
-  perpendicular_line_coefficients << perpendicular_line_offset, perpendicular_line_slope ;
-
-  return perpendicular_line_coefficients ;
-}
-
-
-// Get cross track error
-double get_cross_track_error(double x, double y, std::vector<double> ptsx, std::vector<double> ptsy)
-{
-  // We will approximate cross track error by fitting a line to first two waypoints and computing
-  // shortest distance from vehicle to that line
-  Eigen::VectorXd ptsx_eigen(2) ;
-  Eigen::VectorXd ptsy_eigen(2) ;
-
-  ptsx_eigen << ptsx[0], ptsx[1] ;
-  ptsy_eigen << ptsy[0], ptsy[1] ;
-
-  // Fit a line into first two waypoints
-  Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1) ;
-
-  Eigen::VectorXd perpendicular_line_coefficients =
-    get_perpendicular_line_passing_given_point(polynomial_coefficients, x, y) ;
-
-  // Find an intersection of waypoints line and perpendicular line
-  double lines_intersection_x =
-    (perpendicular_line_coefficients[0] - polynomial_coefficients[0]) /
-    (polynomial_coefficients[1] - perpendicular_line_coefficients[1]) ;
-
-  double lines_intersection_y =
-    (perpendicular_line_coefficients[1] * lines_intersection_x) + perpendicular_line_coefficients[0] ;
-
-  double x_difference = x - lines_intersection_x ;
-  double y_difference = y - lines_intersection_y ;
-
-  // CTE is then a distance between (x, y) and point of intersection of waypoints line and perpendicular line that
-  // passes through (x, y)
-  return std::sqrt((x_difference * x_difference) + (y_difference * y_difference)) ;
-}
-
-double get_normalized_angle(double angle)
-{
-  while(angle < -M_PI) { angle += 2 * M_PI ; }
-  while(angle > M_PI) { angle -= 2 * M_PI ; }
-
-  return angle ;
-}
-
-
-double get_steering_error(double psi, std::vector<double> ptsx, std::vector<double> ptsy)
-{
-  double waypoints_heading = std::atan2(ptsy[1] - ptsy[0], ptsx[1] - ptsx[0]) ;
-  double heading_difference = psi - waypoints_heading ;
-
-  return get_normalized_angle(heading_difference) ;
-}
-
-
 int main() {
   uWS::Hub h;
 
@@ -162,88 +96,8 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          Eigen::VectorXd ptsx_eigen(2) ;
-          Eigen::VectorXd ptsy_eigen(2);
-
-          // We will only use two points for now
-          ptsx_eigen << ptsx[1], ptsx[3] ;
-          ptsy_eigen << ptsy[1], ptsy[3] ;
-
-          double cte = get_cross_track_error(px, py, ptsx, ptsy);
-          double epsi = get_steering_error(psi, ptsx, ptsy);
-
-//          double miles_per_hour_to_metres_per_second = 0.447 ;
-          double miles_per_hour_to_metres_per_second = 1.0 ;
-
-          // Construct state vector
-          Eigen::VectorXd state(6);
-          state << px, py, psi, v * miles_per_hour_to_metres_per_second, cte, epsi;
-
-          // Compute control commands
-          Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1);
-          vector<double> solution = mpc.Solve(state, polynomial_coefficients);
-
-          /*
-          * TODO: Calculate steering angle and throttle using MPC.
-          *
-          * Both are in between [-1, 1].
-          *
-          */
-//          double steer_value = 0 ;
-//          double throttle_value = 0 ;
-
-          double steer_value = solution[0] ;
-          double throttle_value = solution[1] ;
-
-          json msgJson;
-          // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
-          // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          const double Lf = 2.67;
-          msgJson["steering_angle"] = steer_value / (deg2rad(25) * Lf);
-          msgJson["throttle"] = throttle_value;
-
-          //Display the MPC predicted trajectory
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
-
-          // x and y coordinates of path calculated by mpc are in solution vector starting from position 2
-          // even indices store x values, odd y values
-          for(int index = 2 ; index < solution.size() ; ++index)
-          {
-            if(index % 2 == 0) {
-              mpc_x_vals.push_back(solution[index]) ;
-            } else {
-              mpc_y_vals.push_back(solution[index]) ;
-            }
-          }
-
-          // Calculate mpc trajectory in car coordinate system
-          for(int index = 0 ; index < mpc_x_vals.size() ; ++index)
-          {
-            // Distance from point to vehicle in global coordinate system
-            double x_delta = mpc_x_vals[index] - px ;
-            double y_delta = mpc_y_vals[index] - py ;
-            double distance = std::sqrt((x_delta * x_delta) + (y_delta * y_delta)) ;
-
-            // Angle between point and x coordinates
-            double angle = atan2(y_delta, x_delta) - psi ;
-
-            double x = distance * std::cos(angle) ;
-            double y = distance * std::sin(angle) ;
-
-            mpc_x_vals[index] = x ;
-            mpc_y_vals[index] = y ;
-          }
-
-
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-          // the points in the simulator are connected by a Green line
-          msgJson["mpc_x"] = mpc_x_vals;
-          msgJson["mpc_y"] = mpc_y_vals;
-
-          //Display the waypoints/reference line
-          vector<double> next_x_vals ;
-          vector<double> next_y_vals ;
+          vector<double> waypoints_x ;
+          vector<double> waypoints_y ;
 
           // Calculate waypoints in car coordinate system
           for(int index = 0 ; index < ptsx.size() ; ++index)
@@ -259,10 +113,72 @@ int main() {
             double x = distance * std::cos(angle) ;
             double y = distance * std::sin(angle) ;
 
-            next_x_vals.push_back(x) ;
-            next_y_vals.push_back(y) ;
+            waypoints_x.push_back(x) ;
+            waypoints_y.push_back(y) ;
           }
 
+          Eigen::VectorXd waypoints_eigen_x(ptsx.size()) ;
+          Eigen::VectorXd waypoints_eigen_y(ptsx.size()) ;
+
+          // Copy waypoints to eigen vectors
+          for(int index = 0 ; index < ptsx.size() ; ++index)
+          {
+            waypoints_eigen_x[index] = waypoints_x[index] ;
+            waypoints_eigen_y[index] = waypoints_y[index] ;
+          }
+
+          // Compute control commands
+          Eigen::VectorXd polynomial_coefficients = polyfit(waypoints_eigen_x, waypoints_eigen_y, 2);
+//          vector<double> solution = mpc.Solve(state, polynomial_coefficients);
+
+          /*
+          * TODO: Calculate steering angle and throttle using MPC.
+          *
+          * Both are in between [-1, 1].
+          *
+          */
+          double steer_value = 0;
+          double throttle_value = 0;
+
+//          double steer_value = solution[0] ;
+//          double throttle_value = solution[1] ;
+
+          json msgJson;
+          // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
+          // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
+          msgJson["steering_angle"] = steer_value / deg2rad(25);
+          msgJson["throttle"] = throttle_value;
+
+          //Display the MPC predicted trajectory
+          vector<double> mpc_x_vals;
+          vector<double> mpc_y_vals;
+
+//          for (int index = 0; index < 10; ++index)
+//          {
+//            mpc_x_vals.push_back(double(5 * index)) ;
+//            mpc_y_vals.push_back(0) ;
+//
+//          }
+
+          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
+          // the points in the simulator are connected by a Green line
+          msgJson["mpc_x"] = mpc_x_vals;
+          msgJson["mpc_y"] = mpc_y_vals;
+
+          //Display the waypoints/reference line
+          vector<double> next_x_vals ;
+          vector<double> next_y_vals ;
+
+          for(int index = 0 ; index < 10 ; ++index) {
+
+            double x = 5 * index;
+            next_x_vals.push_back(x) ;
+
+            double y = polynomial_coefficients[0] + (polynomial_coefficients[1] * x) +
+              (polynomial_coefficients[2] * x * x) ;
+
+            next_y_vals.push_back(y) ;
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
