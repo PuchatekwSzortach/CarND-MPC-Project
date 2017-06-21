@@ -129,7 +129,25 @@ int main() {
 
           // Compute control commands
           Eigen::VectorXd polynomial_coefficients = polyfit(waypoints_eigen_x, waypoints_eigen_y, 2);
-//          vector<double> solution = mpc.Solve(state, polynomial_coefficients);
+
+          // We adjusted coordinates to be aligned with car and x axis is facing in car direction.
+          // polynomial_coefficients are computed to fit for waypoints in this coordinate system.
+          // Hence cross track error, or distance from car to where it should be, is polynomial evaluated
+          // at x = 0, or just polynomial_coefficients[0]
+          double cross_track_error = polynomial_coefficients[0] ;
+
+          // By similar token error psi is computed as angle of tangent, or derivative, to the curve evaluated at x = 0
+          // Since we are taking error as difference between car heading (0 as we aligned coordinates to it) and that
+          // tangent, error psi is just negative of tangent evaluated at x = 0
+          double error_psi = -std::atan(polynomial_coefficients[1]) ;
+
+
+          // We will do computations with coordinate set to be at car and aligned with its heading,
+          // hence x, y and phi are all 0.
+          Eigen::VectorXd state(6) ;
+          state << 0, 0, 0, v, cross_track_error, error_psi ;
+
+          vector<double> solution = mpc.Solve(state, polynomial_coefficients);
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -137,11 +155,11 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value = 0;
-          double throttle_value = 0;
+//          double steer_value = 0;
+//          double throttle_value = 0;
 
-//          double steer_value = solution[0] ;
-//          double throttle_value = solution[1] ;
+          double steer_value = solution[0] ;
+          double throttle_value = solution[1] ;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -153,12 +171,18 @@ int main() {
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
-//          for (int index = 0; index < 10; ++index)
-//          {
-//            mpc_x_vals.push_back(double(5 * index)) ;
-//            mpc_y_vals.push_back(0) ;
-//
-//          }
+          for (int index = 2; index < solution.size(); ++index)
+          {
+            if(index % 2 == 0)
+            {
+              mpc_x_vals.push_back(solution[index]) ;
+            }
+            else
+            {
+              mpc_y_vals.push_back(solution[index]) ;
+            }
+
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
