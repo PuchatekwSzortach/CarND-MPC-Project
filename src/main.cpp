@@ -132,15 +132,14 @@ int main() {
 
           // We adjusted coordinates to be aligned with car and x axis is facing in car direction.
           // polynomial_coefficients are computed to fit for waypoints in this coordinate system.
-          // Hence cross track error, or distance from car to where it should be, is polynomial evaluated
-          // at x = 0, or just polynomial_coefficients[0]
+          // Since our car is following x-axis of coordinate system it's aligned to, cross track error
+          // is the distance from point (0, 0) where car is to waypoints curve at x = 0
           double cross_track_error = polynomial_coefficients[0] ;
 
           // By similar token error psi is computed as angle of tangent, or derivative, to the curve evaluated at x = 0
-          // Since we are taking error as difference between car heading (0 as we aligned coordinates to it) and that
-          // tangent, error psi is just negative of tangent evaluated at x = 0
+          // We will calculate error psi as difference between car heading and waypoints heading at x = 0. Since coordinate
+          // axis is aligned to car, psi = 0, and waypoints heading is an angle of derivative of curve (or its tangent) at x = 0
           double error_psi = -std::atan(polynomial_coefficients[1]) ;
-
 
           // We will do computations with coordinate set to be at car and aligned with its heading,
           // hence x, y and phi are all 0.

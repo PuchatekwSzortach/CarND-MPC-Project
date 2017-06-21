@@ -125,13 +125,13 @@ class FG_eval {
       fg[1 + v_start + t] = v1 - (v0 + (a0 * dt));
 
       AD<double> f0 = coeffs[0] + (coeffs[1] * x0) + (coeffs[2] * x0 * x0) ;
-      AD<double> cte0_estimate = f0 - y0;
+      AD<double> cte0_estimate = f0 - y0 ;
 
       fg[1 + cte_start + t] = cte1 - (cte0_estimate + (v0 * CppAD::sin(epsi0) * dt)) ;
 
       AD<double> waypoints_heading_estimate0 = CppAD::atan(coeffs[1] + (2 * coeffs[2] * x0)) ;
       AD<double> epsi0_estimate = psi0 - waypoints_heading_estimate0 ;
-      fg[1 + epsi_start + t] = epsi1 - (epsi0_estimate + (v0/Lf * delta0 * dt)) ;
+      fg[1 + epsi_start + t] = epsi1 - (epsi0_estimate - (v0/Lf * delta0 * dt)) ;
     }
 
 
