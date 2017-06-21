@@ -96,6 +96,11 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          // Per advice from Self-Driving Car Project Q&A | MPC Controller video
+          // json also contains steering angle and throttle commands
+          double previous_steering_angle = j[1]["steering_angle"] ;
+          double previous_throttle = j[1]["throttle"] ;
+
           vector<double> waypoints_x ;
           vector<double> waypoints_y ;
 
@@ -130,21 +135,36 @@ int main() {
           // Compute control commands
           Eigen::VectorXd polynomial_coefficients = polyfit(waypoints_eigen_x, waypoints_eigen_y, 2);
 
+          double actuation_delay = 0.1 ;
+
+          const double Lf = 2.67;
+          psi = -0.5 * v * previous_steering_angle * actuation_delay / Lf ;
+
+          // Calculate expected vehicle state after actuation delay. As we aligned coordinates to
+          // have psi=0, car is moving in x direction only. We don't know true acceleratio, so will ignore it.
+          // We also assume there is no steering (since we don't know it), so will not update y nor psi
+          double predicted_x = v * actuation_delay * std::cos(psi) ;
+          double predicted_y = v * actuation_delay * std::sin(psi) ;
+
           // We adjusted coordinates to be aligned with car and x axis is facing in car direction.
           // polynomial_coefficients are computed to fit for waypoints in this coordinate system.
           // Since our car is following x-axis of coordinate system it's aligned to, cross track error
-          // is the distance from point (0, 0) where car is to waypoints curve at x = 0
-          double cross_track_error = polynomial_coefficients[0] ;
+          // is the distance from point (x, 0) where car is to waypoints curve at x
+          double cross_track_error = polyeval(polynomial_coefficients, predicted_x) - predicted_y ;
 
-          // By similar token error psi is computed as angle of tangent, or derivative, to the curve evaluated at x = 0
-          // We will calculate error psi as difference between car heading and waypoints heading at x = 0. Since coordinate
-          // axis is aligned to car, psi = 0, and waypoints heading is an angle of derivative of curve (or its tangent) at x = 0
-          double error_psi = -std::atan(polynomial_coefficients[1]) ;
+          // By similar token error psi is computed as angle of tangent, or derivative, to the curve evaluated at x.
+          // We will calculate error psi as difference between car heading and waypoints heading. Since coordinate
+          // axis is aligned to car, psi = 0, waypoints heading is an angle of derivative of curve (or its tangent) at x
+
+          
+
+          double error_psi = psi - std::atan((2.0 * polynomial_coefficients[2] * predicted_x) + polynomial_coefficients[1]) ;
+          v += actuation_delay * previous_throttle ;
 
           // We will do computations with coordinate set to be at car and aligned with its heading,
           // hence x, y and phi are all 0.
           Eigen::VectorXd state(6) ;
-          state << 0, 0, 0, v, cross_track_error, error_psi ;
+          state << predicted_x, predicted_y, psi, v, cross_track_error, error_psi ;
 
           vector<double> solution = mpc.Solve(state, polynomial_coefficients);
 
@@ -154,8 +174,6 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-//          double steer_value = 0;
-//          double throttle_value = 0;
 
           double steer_value = solution[0] ;
           double throttle_value = solution[1] ;

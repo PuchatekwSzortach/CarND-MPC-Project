@@ -21,3 +21,16 @@ This solved the problem for control with no delay.
 Next step was to re-enable the delay.
 
 #### cte scale = 100, epsi scale = 100, actuation cost terms included, delay included
+Adding actuation delay immediately wrecks havoc with the model. It immediately starts wobbling around the track and falls off it after a few seconds.
+
+To help us tackle delay problem, we can try to predict car state after actuation delay and set that to initial state for MPC solver. Since we don't know steering and acceleration values, we will ignore them. Also as we aligned x-axis to where car faces, we only need to compute change in car x position due to longitudinal velocity. Then we also calculate cte and epsi at new x position.
+
+Updating model that way indeed helps it drive better, but it still wobbles and eventually falls off the track, though after a significantly longer distance than before.
+
+Therefore next step was to scale up cte and epsi cost gains again. I chose to simply increase them 10-folds.
+
+#### cte scale = 1000, epsi scale = 1000, actuation cost terms included, delay included
+This didn't help at all. In fact previous gains seemed to give somewhat better results.
+Since model was swining too wildely, I decided to bump up cost terms due to steering changes.
+
+I kept on bumping steering terms costs up to 100. At that point model behaved better and was able to drive till first turn. Increasing steering terms further didn't help.
