@@ -162,15 +162,6 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-//          Eigen::VectorXd ptsy_eigen(ptsx.size());
-//          Eigen::VectorXd ptsx_eigen(ptsx.size());
-
-//          // Copy std::vector content to eigen vector
-//          for (int index = 0; index < ptsx.size(); ++index) {
-//            ptsx_eigen[index] = ptsx[index];
-//            ptsy_eigen[index] = ptsy[index];
-//          }
-
           Eigen::VectorXd ptsx_eigen(2) ;
           Eigen::VectorXd ptsy_eigen(2);
 
@@ -181,15 +172,16 @@ int main() {
           double cte = get_cross_track_error(px, py, ptsx, ptsy);
           double epsi = get_steering_error(psi, ptsx, ptsy);
 
+//          double miles_per_hour_to_metres_per_second = 0.447 ;
+          double miles_per_hour_to_metres_per_second = 1.0 ;
+
           // Construct state vector
           Eigen::VectorXd state(6);
-          state << px, py, psi, v, cte, epsi;
+          state << px, py, psi, v * miles_per_hour_to_metres_per_second, cte, epsi;
 
           // Compute control commands
-          vector<double> control_commands ;
-
           Eigen::VectorXd polynomial_coefficients = polyfit(ptsx_eigen, ptsy_eigen, 1);
-          control_commands = mpc.Solve(state, polynomial_coefficients);
+          vector<double> solution = mpc.Solve(state, polynomial_coefficients);
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -200,29 +192,37 @@ int main() {
 //          double steer_value = 0 ;
 //          double throttle_value = 0 ;
 
-          double steer_value = control_commands[6] ;
-          double throttle_value = control_commands[7] ;
+          double steer_value = solution[0] ;
+          double throttle_value = solution[1] ;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value / deg2rad(25);
+          const double Lf = 2.67;
+          msgJson["steering_angle"] = steer_value / (deg2rad(25) * Lf);
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
-          for(int index = 0 ; index < ptsx_eigen.size() ; ++index)
+          // x and y coordinates of path calculated by mpc are in solution vector starting from position 2
+          // even indices store x values, odd y values
+          for(int index = 2 ; index < solution.size() ; ++index)
           {
-            double x_global_coordinates = ptsx_eigen[index] ;
+            if(index % 2 == 0) {
+              mpc_x_vals.push_back(solution[index]) ;
+            } else {
+              mpc_y_vals.push_back(solution[index]) ;
+            }
+          }
 
-            double y_global_coordinates =
-                polynomial_coefficients[0] + (polynomial_coefficients[1] * x_global_coordinates) ;
-
-            double x_delta = x_global_coordinates - px ;
-            double y_delta = y_global_coordinates - py ;
-
+          // Calculate mpc trajectory in car coordinate system
+          for(int index = 0 ; index < mpc_x_vals.size() ; ++index)
+          {
+            // Distance from point to vehicle in global coordinate system
+            double x_delta = mpc_x_vals[index] - px ;
+            double y_delta = mpc_y_vals[index] - py ;
             double distance = std::sqrt((x_delta * x_delta) + (y_delta * y_delta)) ;
 
             // Angle between point and x coordinates
@@ -231,9 +231,10 @@ int main() {
             double x = distance * std::cos(angle) ;
             double y = distance * std::sin(angle) ;
 
-            mpc_x_vals.push_back(x) ;
-            mpc_y_vals.push_back(y) ;
+            mpc_x_vals[index] = x ;
+            mpc_y_vals[index] = y ;
           }
+
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line

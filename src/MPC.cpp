@@ -6,7 +6,7 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 30;
+size_t N = 10;
 double dt = 0.1;
 
 // This value assumes the model presented in the classroom is used.
@@ -20,7 +20,9 @@ double dt = 0.1;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double reference_velocity = 10 ;
+//double miles_per_hour_to_metres_per_second = 0.447 ;
+double miles_per_hour_to_metres_per_second = 1.0 ;
+const double reference_velocity = 10.0 * miles_per_hour_to_metres_per_second ;
 
 
 // The solver takes all the state variables and actuator
@@ -58,25 +60,25 @@ class FG_eval {
     // The part of the cost based on the reference state.
     for (int t = 1 ; t < N ; ++t)
     {
-      fg[0] += CppAD::pow(vars[cte_start + t], 2) ;
-      fg[0] += CppAD::pow(vars[epsi_start + t], 2) ;
-//      fg[0] += CppAD::pow(vars[v_start + t] - reference_velocity, 2) ;
+      fg[0] += 2000 * CppAD::pow(vars[cte_start + t], 2) ;
+      fg[0] += 2000 * CppAD::pow(vars[epsi_start + t], 2) ;
+      fg[0] += CppAD::pow(vars[v_start + t] - reference_velocity, 2) ;
 
     }
 
-//    // Minimize the use of actuators
-//    for(int t = 0 ; t < N - 1 ; t++)
-//    {
-//      fg[0] += CppAD::pow(vars[delta_start + t], 2) ;
-//      fg[0] += CppAD::pow(vars[a_start + t], 2) ;
-//    }
-//
-//    // Minimize the value gap between sequential actuations
-//    for(int t = 0 ; t < N - 2 ; ++t)
-//    {
-//      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2) ;
-//      fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2) ;
-//    }
+    // Minimize the use of actuators
+    for(int t = 0 ; t < N - 1 ; t++)
+    {
+      fg[0] += 5 * CppAD::pow(vars[delta_start + t], 2) ;
+      fg[0] += 5 * CppAD::pow(vars[a_start + t], 2) ;
+    }
+
+    // Minimize the value gap between sequential actuations
+    for(int t = 0 ; t < N - 2 ; ++t)
+    {
+      fg[0] += 200 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2) ;
+      fg[0] += 10 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2) ;
+    }
 
     //
     // Setup Constraints
@@ -193,20 +195,15 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // degrees (values in radians).
   // NOTE: Feel free to change this to something else.
   for (size_t index = delta_start; index < a_start; index++) {
-//    vars_lowerbound[index] = -0.436332;
-//    vars_upperbound[index] = 0.436332;
-    vars_lowerbound[index] = -0.2;
-    vars_upperbound[index] = 0.2;
+    vars_lowerbound[index] = -0.436332;
+    vars_upperbound[index] = 0.436332;
   }
 
   // Acceleration/deceleration upper and lower limits.
   // size_t: Feel free to change this to something else.
   for (size_t index = a_start; index < n_vars; index++) {
-//    vars_lowerbound[index] = -1.0;
-//    vars_upperbound[index] = 1.0;
-
-    vars_lowerbound[index] = -0.4;
-    vars_upperbound[index] = 0.4;
+    vars_lowerbound[index] = -1.0;
+    vars_upperbound[index] = 1.0;
   }
 
   // Lower and upper limits for the constraints
@@ -275,8 +272,17 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
 
-  return {solution.x[x_start + 1],   solution.x[y_start + 1],
-          solution.x[psi_start + 1], solution.x[v_start + 1],
-          solution.x[cte_start + 1], solution.x[epsi_start + 1],
-          solution.x[delta_start],   solution.x[a_start]};
+  vector<double> result ;
+
+  result.push_back(solution.x[delta_start]) ;
+  result.push_back(solution.x[a_start]) ;
+
+  for(int index = 0 ; index < N - 1 ; ++index)
+  {
+    result.push_back(solution.x[x_start + index + 1]) ;
+    result.push_back(solution.x[y_start + index + 1]) ;
+
+  }
+
+  return result ;
 }
