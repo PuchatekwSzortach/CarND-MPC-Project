@@ -137,14 +137,20 @@ int main() {
 
           double actuation_delay = 0.1 ;
 
+          // Compute velocity after actuation delay
+          double final_velocity = v + (actuation_delay * previous_throttle) ;
+
           const double Lf = 2.67;
-          psi = -0.5 * v * previous_steering_angle * actuation_delay / Lf ;
+
+          // We set psi to zero, since we aligned coordinates to vehicle
+          psi = 0 ;
+          double final_psi = psi - (v * previous_steering_angle * actuation_delay / Lf) ;
 
           // Calculate expected vehicle state after actuation delay. As we aligned coordinates to
           // have psi=0, car is moving in x direction only. We don't know true acceleratio, so will ignore it.
           // We also assume there is no steering (since we don't know it), so will not update y nor psi
-          double predicted_x = v * actuation_delay * std::cos(psi) ;
-          double predicted_y = v * actuation_delay * std::sin(psi) ;
+          double predicted_x = 0.5 * (final_velocity + v) * actuation_delay * 0.5 * (std::cos(psi) + std::cos(final_psi)) ;
+          double predicted_y = 0.5 * (final_velocity + v) * actuation_delay * 0.5 * (std::sin(psi) + std::sin(final_psi)) ;
 
           // We adjusted coordinates to be aligned with car and x axis is facing in car direction.
           // polynomial_coefficients are computed to fit for waypoints in this coordinate system.
@@ -155,16 +161,12 @@ int main() {
           // By similar token error psi is computed as angle of tangent, or derivative, to the curve evaluated at x.
           // We will calculate error psi as difference between car heading and waypoints heading. Since coordinate
           // axis is aligned to car, psi = 0, waypoints heading is an angle of derivative of curve (or its tangent) at x
-
+          double error_psi = final_psi - std::atan((2.0 * polynomial_coefficients[2] * predicted_x) + polynomial_coefficients[1]) ;
           
-
-          double error_psi = psi - std::atan((2.0 * polynomial_coefficients[2] * predicted_x) + polynomial_coefficients[1]) ;
-          v += actuation_delay * previous_throttle ;
-
           // We will do computations with coordinate set to be at car and aligned with its heading,
           // hence x, y and phi are all 0.
           Eigen::VectorXd state(6) ;
-          state << predicted_x, predicted_y, psi, v, cross_track_error, error_psi ;
+          state << predicted_x, predicted_y, final_psi, final_velocity, cross_track_error, error_psi ;
 
           vector<double> solution = mpc.Solve(state, polynomial_coefficients);
 

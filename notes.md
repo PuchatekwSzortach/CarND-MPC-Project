@@ -23,14 +23,10 @@ Next step was to re-enable the delay.
 #### cte scale = 100, epsi scale = 100, actuation cost terms included, delay included
 Adding actuation delay immediately wrecks havoc with the model. It immediately starts wobbling around the track and falls off it after a few seconds.
 
-To help us tackle delay problem, we can try to predict car state after actuation delay and set that to initial state for MPC solver. Since we don't know steering and acceleration values, we will ignore them. Also as we aligned x-axis to where car faces, we only need to compute change in car x position due to longitudinal velocity. Then we also calculate cte and epsi at new x position.
+To help us tackle delay problem, we predict car state after actuation delay and set that to initial state for MPC solver. New state can be computed based on vehicle model equations. 
+Now there is a slight change I made to vehicle update equations here. Vehicle model we were taught in the class didn't consider effects of longitudinal and radial acceleration on car position after time delay. I included effect of longitudinal and radial acceleration when predicting intial vehicle position after an actuation delay. It would be even better to use that model for solver too, but I didn't do so.
 
-Updating model that way indeed helps it drive better, but it still wobbles and eventually falls off the track, though after a significantly longer distance than before.
+Resulting model was better than original model that didn't account for delay, but it still drove off the track after a few dozen metres. Its steering actuations very widely jumping between extreme left and right steering. To solve that I significantly increased angle-related cost terms, that is epsi cost, cost minimizing steering and cost smoothing steering. I made some minor changes to acceleration gains as well.
 
-Therefore next step was to scale up cte and epsi cost gains again. I chose to simply increase them 10-folds.
-
-#### cte scale = 1000, epsi scale = 1000, actuation cost terms included, delay included
-This didn't help at all. In fact previous gains seemed to give somewhat better results.
-Since model was swining too wildely, I decided to bump up cost terms due to steering changes.
-
-I kept on bumping steering terms costs up to 100. At that point model behaved better and was able to drive till first turn. Increasing steering terms further didn't help.
+#### Final parameters: cte scale = 100, epsi scale = 2000, steering minimization scale = 10000, acceleration minimization scale = 10, steering smoothness scale = 10000, acceleration smoothness scale = 1
+With above cost gains model drives smoothly around the whole track.
