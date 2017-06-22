@@ -6,6 +6,8 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
+// Simply predict 1 sec into future with step of 0.1 sec. Waypoints provided by simulator won't let us predict very far
+// into future when around curves and we don't have any obstactle on road to worry about - thus reasonably short period is sufficient
 size_t N = 10;
 double dt = 0.1;
 
@@ -117,7 +119,7 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1] ;
       AD<double> a0 = vars[a_start + t - 1] ;
 
-      // Constraints imposed by vehicle model
+      // Constraints imposed by vehicle model - based on Udacity notes
       fg[1 + x_start + t] = x1 - (x0 + (v0 * CppAD::cos(psi0) * dt));
       fg[1 + y_start + t] = y1 - (y0 + (v0 * CppAD::sin(psi0) * dt));
 

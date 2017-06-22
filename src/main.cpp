@@ -146,25 +146,19 @@ int main() {
           psi = 0 ;
           double final_psi = psi - (v * previous_steering_angle * actuation_delay / Lf) ;
 
-          // Calculate expected vehicle state after actuation delay. As we aligned coordinates to
-          // have psi=0, car is moving in x direction only. We don't know true acceleratio, so will ignore it.
-          // We also assume there is no steering (since we don't know it), so will not update y nor psi
+          // Calculate expected vehicle state after actuation delay. Use a model that takes into account
+          // longitudinal and radial accelerations, interpolating between velocity at t = 0 and t = actuation_delay
           double predicted_x = 0.5 * (final_velocity + v) * actuation_delay * 0.5 * (std::cos(psi) + std::cos(final_psi)) ;
           double predicted_y = 0.5 * (final_velocity + v) * actuation_delay * 0.5 * (std::sin(psi) + std::sin(final_psi)) ;
 
-          // We adjusted coordinates to be aligned with car and x axis is facing in car direction.
-          // polynomial_coefficients are computed to fit for waypoints in this coordinate system.
-          // Since our car is following x-axis of coordinate system it's aligned to, cross track error
-          // is the distance from point (x, 0) where car is to waypoints curve at x
+          // Approximate cross track error as difference between y coordinate of waypoints at predicted x and car y position
+          // at predicted x
           double cross_track_error = polyeval(polynomial_coefficients, predicted_x) - predicted_y ;
 
-          // By similar token error psi is computed as angle of tangent, or derivative, to the curve evaluated at x.
-          // We will calculate error psi as difference between car heading and waypoints heading. Since coordinate
-          // axis is aligned to car, psi = 0, waypoints heading is an angle of derivative of curve (or its tangent) at x
+          // By similar token error psi is computed as car heading - angle of tangent, or derivative, 
+          // to the waypoints curve evaluated at predicted x
           double error_psi = final_psi - std::atan((2.0 * polynomial_coefficients[2] * predicted_x) + polynomial_coefficients[1]) ;
           
-          // We will do computations with coordinate set to be at car and aligned with its heading,
-          // hence x, y and phi are all 0.
           Eigen::VectorXd state(6) ;
           state << predicted_x, predicted_y, final_psi, final_velocity, cross_track_error, error_psi ;
 
@@ -190,6 +184,7 @@ int main() {
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
+          // MPC path is in solution vector from element 2 to end, alternating between x and y values of consecutive path coordinates
           for (int index = 2; index < solution.size(); ++index)
           {
             if(index % 2 == 0)
